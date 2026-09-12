@@ -21,7 +21,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
+
+      - name: Download original example assets
+        run: |
+          git -c lfs.url=https://github.com/8thwall/aframe-world-effects-example.git/info/lfs lfs pull
 
       - name: Setup Node
         uses: actions/setup-node@v4
