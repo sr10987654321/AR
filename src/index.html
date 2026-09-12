@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#173f38">
+  <meta name="theme-color" content="#211c19">
   <title>NAIDOC Stories · Yarning Circle</title>
   <script src="./external/scripts/8frame-1.5.0.min.js"></script>
   <script src="./external/vendor/engine-binary/dist/xr.js" async data-preload-chunks="slam"></script>
 </head>
 <body>
   <main id="welcome" class="welcome">
-    <header class="masthead"><span class="brand-mark" aria-hidden="true">✳</span><span>NAIDOC STORIES</span><span class="edition">YARNING CIRCLE</span></header>
+    <header class="masthead"><span class="brand-mark" aria-hidden="true">●</span><span>NAIDOC STORIES</span><span class="edition">YARNING CIRCLE</span></header>
     <div class="intro-layout">
       <section class="intro-copy">
         <p class="eyebrow">ARTWORK COMES TO LIFE</p>
@@ -28,8 +28,8 @@
   </main>
   <div id="scene-host"></div>
   <section id="experience" hidden aria-label="Story experience">
-    <header class="camera-header"><button id="home" class="glass-button">← Home</button><span id="mode-label" class="pill">FIND A PAINTING</span><button id="open-setup" class="glass-button">Setup</button></header>
-    <div id="status" class="status-card" role="status" aria-live="polite"><span class="status-light"></span><div><strong id="status-title">Opening the camera</strong><p id="status-detail">Allow camera access when asked.</p></div></div>
+    <header class="camera-header"><button id="home" class="glass-button">← Home</button><span id="mode-label" class="pill">FIND A PAINTING</span><button id="fullscreen" class="glass-button" aria-pressed="false">Full screen</button><button id="open-setup" class="glass-button">Setup</button></header>
+    <p id="fullscreen-note" class="fullscreen-note" role="status" hidden></p><div id="status" class="status-card" role="status" aria-live="polite"><span class="status-light"></span><div><strong id="status-title">Opening the camera</strong><p id="status-detail">Allow camera access when asked.</p></div></div>
     <div id="scan-guide" class="scan-guide"><div class="scan-corners"></div><p id="scan-instruction">Fill the frame with the painting.</p><progress id="scan-progress" max="1" value="0" aria-label="Scanning progress"></progress></div>
     <div id="busy" class="busy" hidden><span class="spinner"></span><span id="busy-text">Loading the artwork…</span></div>
     <div id="story-panel" class="story-panel" hidden>

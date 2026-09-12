@@ -15,12 +15,13 @@ const logLines = []
 function log(message) {
   logLines.push(new Date().toLocaleTimeString() + ' ' + message)
   if (logLines.length > 35) logLines.shift()
-  $('diagnostics').textContent = 'NAIDOC Stories v1.0\n' + navigator.userAgent + '\n\n' + logLines.join('\n')
+  $('diagnostics').textContent = 'NAIDOC Stories v1.1\n' + navigator.userAgent + '\n\n' + logLines.join('\n')
 }
 function status(title, detail, warning = false) {
   $('status-title').textContent = title
   $('status-detail').textContent = detail
   $('status').classList.toggle('warning', warning)
+  document.body.classList.toggle('viewing-story', ['story', 'preview'].includes(phase))
 }
 async function fetchFile(url, kind = 'json', timeout = 45000) {
   const controller = new AbortController()
@@ -232,7 +233,7 @@ function buildScene(isPreview) {
   scene.setAttribute('vr-mode-ui', 'enabled: false')
   scene.setAttribute('device-orientation-permission-ui', 'enabled: false')
   scene.setAttribute('renderer', 'colorManagement: true; alpha: true; antialias: true; maxCanvasWidth: 1600; maxCanvasHeight: 1600')
-  if (isPreview) scene.setAttribute('background', 'color: #e5ebdf')
+  if (isPreview) scene.setAttribute('background', 'color: #eadcc5')
   scene.innerHTML = '<a-camera id="story-camera" position="0 1.3 2.9" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera><a-entity light="type: ambient; intensity: 1.1"></a-entity><a-entity light="type: directional; intensity: 1.2" position="2 4 3"></a-entity><a-entity light="type: directional; intensity: 0.5" position="-3 2 -2"></a-entity><a-entity id="story-anchor" visible="false"><a-entity id="model-pivot"></a-entity></a-entity>'
   anchor = scene.querySelector('#story-anchor'); pivot = scene.querySelector('#model-pivot')
   if (!isPreview) {
@@ -362,6 +363,7 @@ async function showStory(story, pose) {
     hideBusy()
     needsReanchor = false
     phase = mode === 'preview' ? 'preview' : 'story'
+    document.body.classList.add('viewing-story')
     anchor.object3D.visible = mode === 'preview' || trackingNormal
     $('mode-label').textContent = mode === 'preview' ? '3D ARTWORK VIEW' : 'STORY IN PLACE'
     if (mode === 'ar') status('Your artwork is in place', 'You can move back to your seat. Keep the device looking into the circle.')
@@ -478,6 +480,45 @@ async function init() {
     log(stories.length + ' story target(s) ready')
   } catch (error) { $('start').textContent = 'Camera experience unavailable'; $('welcome-error').textContent=error.message; log(error.message) }
 }
+// Fullscreen keeps the camera, artwork and accessible controls together.
+let focusView = false, fullscreenNoteTimer
+function setFocusView(enabled) {
+  focusView = enabled
+  document.body.classList.toggle('focus-view', enabled)
+  $('fullscreen').textContent = enabled ? 'Exit full screen' : 'Full screen'
+  $('fullscreen').setAttribute('aria-pressed', String(enabled))
+  $('fullscreen-note').hidden = true
+  window.dispatchEvent(new Event('resize'))
+}
+const fullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement
+$('fullscreen').addEventListener('click', async () => {
+  if (focusView) {
+    try {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen
+      if (fullscreenElement() && exit) await exit.call(document)
+    } catch (error) { log('Exit fullscreen: ' + error.message) }
+    setFocusView(false)
+    return
+  }
+  setFocusView(true)
+  try {
+    const request = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen
+    if (!request) throw new Error('Fullscreen unavailable')
+    await request.call(document.documentElement)
+  } catch (_) {
+    $('fullscreen-note').textContent = 'Expanded view — this browser keeps its address bar visible.'
+    $('fullscreen-note').hidden = false
+    clearTimeout(fullscreenNoteTimer)
+    fullscreenNoteTimer = setTimeout(() => { $('fullscreen-note').hidden = true }, 5000)
+  }
+})
+for (const event of ['fullscreenchange', 'webkitfullscreenchange']) {
+  document.addEventListener(event, () => setFocusView(!!fullscreenElement()))
+}
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && focusView && !fullscreenElement()) setFocusView(false)
+})
+
 $('start').addEventListener('click', () => startExperience(false))
 $('preview').addEventListener('click', () => startExperience(true))
 $('home').addEventListener('click', () => { const url = new URL(location.href); url.searchParams.delete('view'); location.href = url.href })
