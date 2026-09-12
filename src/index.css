@@ -18,3 +18,38 @@
 @media(max-width:700px){
 .welcome{padding:16px 22px}.intro-layout{gap:20px;padding:24px 0;position:relative}.intro-copy{position:relative}h1{font-size:clamp(36px,10vw,51px);max-width:95%}.intro-text{max-width:100%}.art-card{display:flex;aspect-ratio:auto;height:210px;border-radius:95px 95px 18px 18px;grid-row:2}.art-card img{height:190px;width:85%}.art-orbit{height:200px;width:200px}.art-card figcaption{bottom:12px;left:18px;right:18px;font-size:8px}.steps{gap:18px;font-size:10px}.edition{font-size:7px;letter-spacing:.08em}.masthead{gap:8px}#start{width:100%}.camera-header #mode-label{display:none}.camera-header{gap:6px}.glass-button{font-size:12px;padding:10px 12px}.story-panel{padding:12px 16px 10px}.story-heading h2{font-size:22px}.audio-row{margin-top:8px}
 }
+
+/* Translucent charcoal glass for the camera and listening interface. */
+#experience .story-panel,
+#experience .status-card,
+#experience .glass-button,
+#experience .pill,
+#experience .busy,
+#experience .fullscreen-note,
+#experience .scan-guide p,
+#experience .preview-picker select {
+  background:rgba(12,12,14,.78);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.2);
+  -webkit-backdrop-filter:blur(18px) saturate(120%);
+  backdrop-filter:blur(18px) saturate(120%);
+  box-shadow:0 8px 28px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.07);
+}
+#experience .story-heading .eyebrow{color:var(--gold)}
+#experience .status-card p,
+#experience .time-row,
+#experience .audio-message{color:#e0e0e3}
+#experience .icon-button{color:#fff}
+#experience .play-button{background:var(--gold);color:#171719}
+#experience #seek{accent-color:var(--gold);color-scheme:dark}
+#experience .story-actions .button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff}
+#experience .status-light{background:var(--gold)}
+#experience .status-card.warning .status-light{background:#ffb46b}
+#experience .spinner{border-color:#ffffff40;border-top-color:var(--gold)}
+#experience .preview-picker select{color-scheme:dark}
+#experience .preview-picker option{background:#19191c;color:#fff}
+@media(prefers-reduced-transparency:reduce){
+  #experience .story-panel,#experience .status-card,#experience .glass-button,
+  #experience .pill,#experience .busy,#experience .fullscreen-note,
+  #experience .scan-guide p,#experience .preview-picker select{background:#19191c;-webkit-backdrop-filter:none;backdrop-filter:none}
+}
