@@ -15,7 +15,7 @@ const logLines = []
 function log(message) {
   logLines.push(new Date().toLocaleTimeString() + ' ' + message)
   if (logLines.length > 35) logLines.shift()
-  $('diagnostics').textContent = 'NAIDOC Stories v1.2\n' + navigator.userAgent + '\n\n' + logLines.join('\n')
+  $('diagnostics').textContent = 'NAIDOC Stories v1.1\n' + navigator.userAgent + '\n\n' + logLines.join('\n')
 }
 function status(title, detail, warning = false) {
   $('status-title').textContent = title
@@ -316,18 +316,14 @@ function onTarget({detail}) {
 }
 function onTracking({detail}) {
   trackingNormal = detail.status === 'NORMAL'
-  log('Tracking ' + detail.status + (detail.reason ? ': ' + detail.reason : ''))
+  log('Tracking ' + detail.status)
   clearTimeout(limitedTimer)
   if (!trackingNormal) {
     resetCandidate()
     if (current && phase === 'story') {
       anchor.object3D.visible = false; pauseAudio()
-      status('Finding the surroundings', 'Move slowly and look at the ground around the circle. Your story is paused.', true)
-      // Keep the saved world anchor while SLAM relocalises. Image loss alone
-      // must never require a new placement or reset the narration.
-      limitedTimer = setTimeout(() => {
-        if (!trackingNormal && phase === 'story') status('Still finding the surroundings', 'Look back towards the area you scanned. If tracking does not recover, exit full screen and choose Reposition by scanning.', true)
-      }, 10000)
+      status('Finding the surroundings', 'Move slowly and point towards the painting and nearby ground.', true)
+      limitedTimer = setTimeout(() => { if (!trackingNormal && phase === 'story') beginRescan() }, 1500)
     }
   } else if (phase === 'story' && !needsReanchor) {
     anchor.object3D.visible = true
@@ -373,7 +369,7 @@ async function showStory(story, pose) {
     if (mode === 'ar') status('Your artwork is in place', 'You can move back to your seat. Keep the device looking into the circle.')
     if (!reusing) loadNarration(story, mode === 'ar')
     else { $('audio-message').textContent = 'Artwork repositioned. Tap play to continue.'; updateAudioUI() }
-    if (mode === 'ar' && !trackingNormal) onTracking({detail:{status:'LIMITED', reason:'Waiting for world tracking'}})
+    if (mode === 'ar' && !trackingNormal) beginRescan()
   } catch (error) { if (op === operation) showError(error) }
 }
 function beginRescan() {
