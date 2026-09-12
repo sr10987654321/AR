@@ -32,6 +32,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Include AR libraries in the website
+        run: |
+          npm install --no-save @8thwall/engine-binary@1 @8thwall/xrextras@1 @8thwall/landing-page@1
+          mkdir -p external/vendor
+          cp -R node_modules/@8thwall/engine-binary external/vendor/engine-binary
+          cp -R node_modules/@8thwall/xrextras external/vendor/xrextras
+          cp -R node_modules/@8thwall/landing-page external/vendor/landing-page
+          
       - name: Build
         run: npm run build
 
