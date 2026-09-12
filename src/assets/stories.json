@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "stories": [
+    {
+      "id": "1",
+      "enabled": true,
+      "title": "Dragonfly",
+      "model": "assets/model-1.glb",
+      "audio": "assets/audio-1.mp3",
+      "target": "image-targets/target-1.json",
+      "targetName": "target-1",
+      "image": "assets/target-1.png",
+      "imageAlt": "A blue dragonfly painted on wood",
+      "targetWidthMeters": 0.15,
+      "targetImageWidthFactor": 1.28,
+      "sizeMeters": 1.2,
+      "liftMeters": 0.25,
+      "yawDegrees": 0,
+      "pitchDegrees": 0,
+      "rollDegrees": 0
+    }
+  ]
+}

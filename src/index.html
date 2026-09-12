@@ -1,99 +1,64 @@
-<!DOCTYPE html>
-<html>
-
+<!doctype html>
+<html lang="en-AU">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <title>A-Frame: Tap to Place Ground</title>
-  <meta itemprop="name" content="A-Frame: Tap to Place Ground">
-  <meta name="twitter:title" content="A-Frame: Tap to Place Ground">
-  <meta property="og:title" content="A-Frame: Tap to Place Ground">
-  <meta property="og:site_name" content="A-Frame: Tap to Place Ground">
-  <meta name="description" content="This example allows the user to grow cacti 🌵  by tapping or clicking the ground. Showcases raycasting, spawning objects, and importing a 3D model.">
-  <meta itemprop="description" content="This example allows the user to grow cacti 🌵  by tapping or clicking the ground. Showcases raycasting, spawning objects, and importing a 3D model.">
-  <meta property="og:description" content="This example allows the user to grow cacti 🌵  by tapping or clicking the ground. Showcases raycasting, spawning objects, and importing a 3D model.">
-  <meta name="twitter:description" content="This example allows the user to grow cacti 🌵  by tapping or clicking the ground. Showcases raycasting, spawning objects, and importing a 3D model.">
-  <meta property="og:image" content="https://8thwall.org/aframe-world-effects/assets/preview.gif"/>
-
-  <script crossorigin="anonymous" src="./external/scripts/8frame-1.5.0.min.js"></script>
-  <script src="./external/vendor/xrextras/dist/xrextras.js"></script>
-  <script src="./external/vendor/landing-page/dist/landing-page.js"></script>
-  <script src="./external/vendor/engine-binary/dist/xr.js"
-        async
-        data-preload-chunks="slam"></script></head>
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#173f38">
+  <title>NAIDOC Stories · Yarning Circle</title>
+  <script src="./external/scripts/8frame-1.5.0.min.js"></script>
+  <script src="./external/vendor/engine-binary/dist/xr.js" async data-preload-chunks="slam"></script>
+</head>
 <body>
-<script src="bundle.js"></script>
-<!-- Copyright (c) 2022 8th Wall, Inc. -->
-<!-- body.html is optional; elements will be added to your html body after app.js is loaded. -->
-
-<div class="over">
-  <span id="promptText">Tap To Place Model</span>
-</div>
-
-<!-- Add the tap-place component to the scene so it has an effect -->
-<a-scene
-  tap-place
-  landing-page
-  xrextras-loading
-  xrextras-runtime-error
-  renderer="colorManagement:true"
-  xrweb="
-    allowedDevices: any;
-    defaultEnvironmentFogIntensity: 0.5; 
-    defaultEnvironmentFloorTexture: #groundTex; 
-    defaultEnvironmentFloorColor: #FFF;
-    defaultEnvironmentSkyBottomColor: #B4C4CC; 
-    defaultEnvironmentSkyTopColor: #5ac8fa;
-    defaultEnvironmentSkyGradientStrength: 0.5;">
-
-  <!-- We can define assets here to be loaded when A-Frame initializes -->
-  <a-assets>
-    <img id="groundTex" src="assets/sand.jpg">
-    <a-asset-item id="cactusModel" src="assets/cactus.glb"></a-asset-item>
-  </a-assets>
-
-  <!-- The raycaster will emit mouse events on scene objects specified with the cantap class -->
-  <a-camera
-    id="camera"
-    position="0 8 8"
-    raycaster="objects: .cantap"
-    cursor="
-      fuse: false;
-      rayOrigin: mouse;">
-  </a-camera>
-
-  <a-entity
-    light="
-      type: directional;
-      intensity: 0.8;
-      castShadow: true;
-      shadowMapHeight:2048;
-      shadowMapWidth:2048;
-      shadowCameraTop: 40;
-      shadowCameraBottom: -40;
-      shadowCameraRight: 40;
-      shadowCameraLeft: -40;
-      target: #camera"
-    xrextras-attach="target: camera; offset: 8 15 4"
-    position="1 4.3 2.5"
-    shadow>
-  </a-entity>
-
-  <a-light type="ambient" intensity="0.5"></a-light>
-
-  <!-- Adding the cantap class allows the ground to be clicked -->
-  <a-box
-    id="ground"
-    class="cantap"
-    scale="1000 2 1000"
-    position="0 -0.99 0"
-    material="shader: shadow; transparent: true; opacity: 0.4"
-    shadow>
-  </a-box>
-</a-scene>
-
+  <main id="welcome" class="welcome">
+    <header class="masthead"><span class="brand-mark" aria-hidden="true">✳</span><span>NAIDOC STORIES</span><span class="edition">YARNING CIRCLE</span></header>
+    <div class="intro-layout">
+      <section class="intro-copy">
+        <p class="eyebrow">ARTWORK COMES TO LIFE</p>
+        <h1>A picture.<br>A story.<br><em>A place to listen.</em></h1>
+        <p class="intro-text">Find a painting in the centre of the circle. Scan it, watch the artwork appear, then take your seat and listen.</p>
+        <div class="steps"><span><b>01</b> Scan the painting</span><span><b>02</b> Let it come to life</span><span><b>03</b> Sit and listen</span></div>
+        <button id="start" class="button primary" disabled>Preparing stories…</button>
+        <button id="preview" class="text-button" disabled>Explore the artwork in 3D ↗</button>
+        <p class="small-note">AR uses your camera. Begin close to the painting.</p>
+        <p id="welcome-error" class="error-text" role="alert"></p>
+      </section>
+      <figure class="art-card"><div class="art-orbit" aria-hidden="true"></div><img id="hero" src="assets/target-1.png" alt="A blue dragonfly painted on wood"><figcaption><span>LOOK A LITTLE CLOSER</span><span id="story-count">01 STORY</span></figcaption></figure>
+    </div>
+    <footer class="welcome-footer"><span>Created with imagination. Shared through stories.</span><button id="welcome-setup" class="text-button">Setup</button></footer>
+  </main>
+  <div id="scene-host"></div>
+  <section id="experience" hidden aria-label="Story experience">
+    <header class="camera-header"><button id="home" class="glass-button">← Home</button><span id="mode-label" class="pill">FIND A PAINTING</span><button id="open-setup" class="glass-button">Setup</button></header>
+    <div id="status" class="status-card" role="status" aria-live="polite"><span class="status-light"></span><div><strong id="status-title">Opening the camera</strong><p id="status-detail">Allow camera access when asked.</p></div></div>
+    <div id="scan-guide" class="scan-guide"><div class="scan-corners"></div><p id="scan-instruction">Fill the frame with the painting.</p><progress id="scan-progress" max="1" value="0" aria-label="Scanning progress"></progress></div>
+    <div id="busy" class="busy" hidden><span class="spinner"></span><span id="busy-text">Loading the artwork…</span></div>
+    <div id="story-panel" class="story-panel" hidden>
+      <div class="story-heading"><div><p id="story-number" class="eyebrow">STORY 01</p><h2 id="story-title">Dragonfly</h2></div><button id="mute" class="icon-button" aria-label="Mute narration" aria-pressed="false">Sound on</button></div>
+      <div class="audio-row"><button id="play" class="play-button" aria-label="Play narration">▶</button><div class="audio-track"><input id="seek" aria-label="Narration position" type="range" min="0" max="1000" value="0"><div class="time-row"><span id="elapsed">0:00</span><span id="duration">0:00</span></div></div><button id="restart" class="icon-button" aria-label="Restart narration">↺</button></div>
+      <p id="audio-message" class="audio-message" role="status"></p>
+      <div class="story-actions"><button id="rescan" class="button secondary">Reposition by scanning</button><button id="another" class="button secondary">Another story</button></div>
+    </div>
+    <div id="preview-picker" class="preview-picker" hidden><label for="story-select">Choose an artwork</label><select id="story-select"></select><span>Drag to turn · Pinch or scroll to zoom</span></div>
+    <button id="resume" class="button primary resume-button" hidden>Continue</button>
+  </section>
+  <dialog id="setup-dialog">
+    <form method="dialog" class="dialog-top"><div><p class="eyebrow">TEACHER SETUP</p><h2>Make it fit the space.</h2></div><button class="icon-button" aria-label="Close setup">✕</button></form>
+    <p class="dialog-note">Adjustments save on this device. Export them to use the same settings on everyone’s devices.</p>
+    <label class="field">Story<select id="setup-story"></select></label>
+    <div class="setup-grid">
+      <label class="field">Artwork size (metres)<input id="size" type="number" min="0.1" max="8" step="0.1"></label>
+      <label class="field">Height above painting (metres)<input id="lift" type="number" min="0" max="5" step="0.1"></label>
+      <label class="field">Turn (degrees)<input id="yaw" type="number" min="-360" max="360" step="15"></label>
+      <label class="field">Tilt (degrees)<input id="pitch" type="number" min="-180" max="180" step="15"></label>
+      <label class="field">Roll (degrees)<input id="roll" type="number" min="-180" max="180" step="15"></label>
+      <label class="field">Painted wood width (cm)<input id="target-width" type="number" min="1" max="200" step="0.1"></label>
+    </div>
+    <p class="dialog-note">Size means the longest side of the model. Measure the wood at its widest point. Width changes apply on the next scan. The image margin has already been allowed for on the dragonfly target.</p>
+    <div class="dialog-actions"><button id="reset-settings" class="button secondary">Reset this story</button><button id="export-settings" class="button primary">Export story settings</button></div>
+    <p id="settings-message" class="dialog-note" role="status"></p>
+    <details><summary>Device and loading details</summary><pre id="diagnostics"></pre></details>
+  </dialog>
+  <dialog id="error-dialog"><h2>Let’s try that again.</h2><p id="error-detail"></p><p class="dialog-note">Check camera permission and your connection. You can also explore the artwork in 3D.</p><div class="dialog-actions"><button id="reload" class="button primary">Reload</button><button id="error-preview" class="button secondary">View in 3D</button></div></dialog>
+  <script src="bundle.js"></script>
 </body>
-
 </html>
