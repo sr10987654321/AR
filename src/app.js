@@ -15,7 +15,7 @@ const logLines = []
 function log(message) {
   logLines.push(new Date().toLocaleTimeString() + ' ' + message)
   if (logLines.length > 35) logLines.shift()
-  $('diagnostics').textContent = 'NAIDOC Stories v1.1\n' + navigator.userAgent + '\n\n' + logLines.join('\n')
+  $('diagnostics').textContent = 'NAIDOC Stories v1.4\n' + navigator.userAgent + '\n\n' + logLines.join('\n')
 }
 function status(title, detail, warning = false) {
   $('status-title').textContent = title
@@ -45,15 +45,16 @@ const storageKey = 'naidoc-story-settings-v1'
 let overrides = {}
 try { overrides = JSON.parse(localStorage.getItem(storageKey) || '{}') } catch (_) {}
 const numericSettings = {
+  offsetXMeters: ['offset-x', -5, 5, 1, 0],
   sizeMeters: ['size', .1, 8, 1], liftMeters: ['lift', 0, 5, 1],
   yawDegrees: ['yaw', -360, 360, 1], pitchDegrees: ['pitch', -180, 180, 1],
   rollDegrees: ['roll', -180, 180, 1], targetWidthMeters: ['target-width', .01, 2, 100],
 }
 function settings(story) {
   const result = {...story}
-  for (const [key, [,lo,hi]] of Object.entries(numericSettings)) {
+  for (const [key, [,lo,hi,,fallback = lo]] of Object.entries(numericSettings)) {
     const value = Number(overrides[story.id]?.[key] ?? story[key])
-    result[key] = clamp(Number.isFinite(value) ? value : lo, lo, hi)
+    result[key] = clamp(Number.isFinite(value) ? value : fallback, lo, hi)
   }
   return result
 }
@@ -189,6 +190,8 @@ function applyModelSettings() {
   pivot.object3D.rotation.set(radians(cfg.pitchDegrees), radians(cfg.yawDegrees) + (mode === 'preview' ? previewYaw : 0), radians(cfg.rollDegrees), 'YXZ')
   const scale = mode === 'preview' ? 1.25 / modelExtent : cfg.sizeMeters * worldUnitsPerMetre / modelExtent
   pivot.object3D.scale.setScalar(scale)
+  // Offset in the placement's horizontal axis, independent of model rotation.
+  pivot.object3D.position.x = cfg.offsetXMeters * (mode === 'preview' ? 1.25 / cfg.sizeMeters : worldUnitsPerMetre)
   pivot.object3D.position.y = mode === 'preview' ? 0 : cfg.liftMeters * worldUnitsPerMetre
 }
 function loadModel(story) {
@@ -233,7 +236,7 @@ function buildScene(isPreview) {
   scene.setAttribute('vr-mode-ui', 'enabled: false')
   scene.setAttribute('device-orientation-permission-ui', 'enabled: false')
   scene.setAttribute('renderer', 'colorManagement: true; alpha: true; antialias: true; maxCanvasWidth: 1600; maxCanvasHeight: 1600')
-  if (isPreview) scene.setAttribute('background', 'color: #eadcc5')
+  if (isPreview) scene.setAttribute('background', 'color: #101216')
   scene.innerHTML = '<a-camera id="story-camera" position="0 1.3 2.9" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera><a-entity light="type: ambient; intensity: 1.1"></a-entity><a-entity light="type: directional; intensity: 1.2" position="2 4 3"></a-entity><a-entity light="type: directional; intensity: 0.5" position="-3 2 -2"></a-entity><a-entity id="story-anchor" visible="false"><a-entity id="model-pivot"></a-entity></a-entity>'
   anchor = scene.querySelector('#story-anchor'); pivot = scene.querySelector('#model-pivot')
   if (!isPreview) {
@@ -316,14 +319,18 @@ function onTarget({detail}) {
 }
 function onTracking({detail}) {
   trackingNormal = detail.status === 'NORMAL'
-  log('Tracking ' + detail.status)
+  log('Tracking ' + detail.status + (detail.reason ? ': ' + detail.reason : ''))
   clearTimeout(limitedTimer)
   if (!trackingNormal) {
     resetCandidate()
     if (current && phase === 'story') {
       anchor.object3D.visible = false; pauseAudio()
-      status('Finding the surroundings', 'Move slowly and point towards the painting and nearby ground.', true)
-      limitedTimer = setTimeout(() => { if (!trackingNormal && phase === 'story') beginRescan() }, 1500)
+      status('Finding the surroundings', 'Move slowly and look at the ground around the circle. Your story is paused.', true)
+      // Keep the saved world anchor while SLAM relocalises. Image loss alone
+      // must never require a new placement or reset the narration.
+      limitedTimer = setTimeout(() => {
+        if (!trackingNormal && phase === 'story') status('Still finding the surroundings', 'Look back towards the area you scanned. If tracking does not recover, exit full screen and choose Reposition by scanning.', true)
+      }, 10000)
     }
   } else if (phase === 'story' && !needsReanchor) {
     anchor.object3D.visible = true
@@ -369,7 +376,7 @@ async function showStory(story, pose) {
     if (mode === 'ar') status('Your artwork is in place', 'You can move back to your seat. Keep the device looking into the circle.')
     if (!reusing) loadNarration(story, mode === 'ar')
     else { $('audio-message').textContent = 'Artwork repositioned. Tap play to continue.'; updateAudioUI() }
-    if (mode === 'ar' && !trackingNormal) beginRescan()
+    if (mode === 'ar' && !trackingNormal) onTracking({detail:{status:'LIMITED', reason:'Waiting for world tracking'}})
   } catch (error) { if (op === operation) showError(error) }
 }
 function beginRescan() {
