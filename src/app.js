@@ -15,7 +15,7 @@ const logLines = []
 function log(message) {
   logLines.push(new Date().toLocaleTimeString() + ' ' + message)
   if (logLines.length > 35) logLines.shift()
-  $('diagnostics').textContent = 'NAIDOC Stories v1.6\n' + navigator.userAgent + '\n\n' + logLines.join('\n')
+  $('diagnostics').textContent = 'NAIDOC Stories v1.7\n' + navigator.userAgent + '\n\n' + logLines.join('\n')
 }
 function status(title, detail, warning = false) {
   $('status-title').textContent = title
@@ -37,7 +37,7 @@ async function fetchFile(url, kind = 'json', timeout = 45000) {
 }
 let manifest, stories = [], targets = [], scene, anchor, pivot, modelEl, current, candidate
 let phase = 'welcome', mode = 'ar', trackingNormal = false, needsReanchor = false
-let busy = false, operation = 0, worldUnitsPerMetre = 1, placementYaw = 0, modelExtent = 1
+let busy = false, operation = 0, worldUnitsPerMetre = 1, placementYaw = 0, placementNormalSign = 1, modelExtent = 1
 let previewYaw = 0, previewPitch = .55, previewDistance = 2.2, previewCentre = .4, sceneWatchdog, loadedStoryId = null
 let audioElement = null, narrationRequest = 0, audioReady = false, audioLoadFailed = false, muted = false
 let limitedTimer, captureTimer
@@ -46,7 +46,8 @@ let overrides = {}
 try { overrides = JSON.parse(localStorage.getItem(storageKey) || '{}') } catch (_) {}
 const numericSettings = {
   offsetXMeters: ['offset-x', -5, 5, 1, 0],
-  sizeMeters: ['size', .1, 8, 1], liftMeters: ['lift', 0, 5, 1],
+  liftMeters: ['lift', -5, 5, 1, 0], depthMeters: ['depth', 0, 5, 1, .35],
+  sizeMeters: ['size', .1, 8, 1],
   yawDegrees: ['yaw', -360, 360, 1], pitchDegrees: ['pitch', -180, 180, 1],
   rollDegrees: ['roll', -180, 180, 1], targetWidthMeters: ['target-width', .01, 2, 100],
 }
@@ -56,6 +57,9 @@ function settings(story) {
     const value = Number(overrides[story.id]?.[key] ?? story[key])
     result[key] = clamp(Number.isFinite(value) ? value : fallback, lo, hi)
   }
+  // Old story files used liftMeters for height above a ground target. When an
+  // unlabelled story first moves to wall mode, begin centred instead.
+  if (!story.placementMode && story.depthMeters == null) result.liftMeters = 0
   return result
 }
 function showBusy(message) { busy = true; $('busy-text').textContent = message; $('busy').hidden = false }
@@ -186,6 +190,7 @@ function applyModelSettings() {
   // Offset in the placement's horizontal axis, independent of model rotation.
   pivot.object3D.position.x = cfg.offsetXMeters * (mode === 'preview' ? 1.25 / cfg.sizeMeters : worldUnitsPerMetre)
   pivot.object3D.position.y = mode === 'preview' ? 0 : cfg.liftMeters * worldUnitsPerMetre
+  pivot.object3D.position.z = mode === 'preview' ? 0 : cfg.depthMeters * placementNormalSign * worldUnitsPerMetre
 }
 function loadModel(story) {
   disposeModel()
@@ -212,7 +217,8 @@ function loadModel(story) {
       const size = box.getSize(new THREE.Vector3()), centre = box.getCenter(new THREE.Vector3())
       modelExtent = Math.max(size.x, size.y, size.z)
       if (!Number.isFinite(modelExtent) || modelExtent <= 0) { done(new Error('This model has no visible geometry.')); return }
-      object.position.x -= centre.x; object.position.z -= centre.z; object.position.y -= box.min.y
+      object.position.x -= centre.x; object.position.z -= centre.z
+      object.position.y -= (story.placementMode || 'wall') === 'ground' ? box.min.y : centre.y
       loadedStoryId = story.id
       applyModelSettings()
       if (mode === 'preview') { previewCentre = size.y / modelExtent * 1.25 / 2; updatePreviewCamera() }
@@ -291,21 +297,27 @@ function onTarget({detail}) {
   if (!['scanning','reacquiring'].includes(phase) || busy || !trackingNormal || document.hidden) return
   const story = stories.find(s => s.targetName === detail.name)
   if (!story || (needsReanchor && story.id !== current?.id)) return
-  if (!detail.position || ![detail.position.x,detail.position.y,detail.position.z,detail.scale,detail.scaledWidth].every(Number.isFinite)) return
+  if (!detail.position || !detail.rotation || ![
+    detail.position.x,detail.position.y,detail.position.z,
+    detail.rotation.x,detail.rotation.y,detail.rotation.z,detail.rotation.w,
+    detail.scale,detail.scaledWidth,
+  ].every(Number.isFinite)) return
   const cfg = settings(story)
   const units = detail.scaledWidth * detail.scale / (cfg.targetWidthMeters * (story.targetImageWidthFactor || 1))
   if (units <= 0) return
   const now = performance.now(), point = new THREE.Vector3().copy(detail.position)
+  const rotation = new THREE.Quaternion().copy(detail.rotation).normalize()
   if (!candidate || candidate.name !== detail.name || now - candidate.last > 400 || point.distanceTo(candidate.position) > units * .045) {
-    candidate = {name:detail.name, since:now, last:now, count:1, position:point, units}
+    candidate = {name:detail.name, since:now, last:now, count:1, position:point, rotation, units}
   } else {
     candidate.position.lerp(point, .25); candidate.units = candidate.units * .75 + units * .25
+    candidate.rotation.slerp(rotation, .25)
     candidate.last = now; candidate.count++
   }
   $('scan-instruction').textContent = 'Painting found. Hold still for a moment…'
   $('scan-progress').value = Math.min(1,(now - candidate.since)/850)
   if (now - candidate.since >= 850 && candidate.count >= 8) {
-    const pose = {position:candidate.position.clone(),units:candidate.units}
+    const pose = {position:candidate.position.clone(),rotation:candidate.rotation.clone(),units:candidate.units}
     phase = 'loading'
     showStory(story, pose)
   }
@@ -318,7 +330,7 @@ function onTracking({detail}) {
     resetCandidate()
     if (current && phase === 'story') {
       anchor.object3D.visible = false; pauseAudio()
-      status('Finding the surroundings', 'Move slowly and look at the ground around the circle. Your story is paused.', true)
+      status('Finding the surroundings', 'Move slowly and look around the painting and tree. Your story is paused.', true)
       // Keep the saved world anchor while SLAM relocalises. Image loss alone
       // must never require a new placement or reset the narration.
       limitedTimer = setTimeout(() => {
@@ -327,7 +339,7 @@ function onTracking({detail}) {
     }
   } else if (phase === 'story' && !needsReanchor) {
     anchor.object3D.visible = true
-    status('Your artwork is in place', 'Take your seat and listen. Tap play to continue the recording.')
+    status('Your artwork is in place', 'Step back slowly and keep looking towards the tree. Tap play to continue.')
   } else if (phase === 'scanning') {
     status('Find a painting', 'Hold your device close enough to see the painted details.')
   }
@@ -345,11 +357,20 @@ async function showStory(story, pose) {
     anchor.object3D.position.copy(pose.position)
     const cameraPosition = new THREE.Vector3()
     $('story-camera').object3D.getWorldPosition(cameraPosition)
-    placementYaw = Math.atan2(cameraPosition.x - pose.position.x, cameraPosition.z - pose.position.z)
-    anchor.object3D.rotation.set(0, placementYaw, 0)
-    log('Placed ' + story.targetName + '; units/metre ' + pose.units.toFixed(3))
+    if ((story.placementMode || 'wall') === 'wall') {
+      anchor.object3D.quaternion.copy(pose.rotation)
+      const targetNormal = new THREE.Vector3(0,0,1).applyQuaternion(pose.rotation)
+      const towardsCamera = cameraPosition.clone().sub(pose.position)
+      placementNormalSign = targetNormal.dot(towardsCamera) < 0 ? -1 : 1
+      placementYaw = 0
+    } else {
+      placementYaw = Math.atan2(cameraPosition.x - pose.position.x, cameraPosition.z - pose.position.z)
+      anchor.object3D.rotation.set(0, placementYaw, 0)
+      placementNormalSign = 1
+    }
+    log('Placed ' + story.targetName + ' in ' + (story.placementMode || 'wall') + ' mode; units/metre ' + pose.units.toFixed(3))
   } else {
-    worldUnitsPerMetre = 1; anchor.object3D.position.set(0,0,0); anchor.object3D.rotation.set(0,0,0)
+    worldUnitsPerMetre = 1; placementNormalSign = 1; anchor.object3D.position.set(0,0,0); anchor.object3D.rotation.set(0,0,0)
     previewYaw = 0; previewPitch = .55; previewDistance = 2.2; updatePreviewCamera()
   }
   try {
@@ -366,7 +387,7 @@ async function showStory(story, pose) {
     document.body.classList.add('viewing-story')
     anchor.object3D.visible = mode === 'preview' || trackingNormal
     $('mode-label').textContent = mode === 'preview' ? '3D ARTWORK VIEW' : 'STORY IN PLACE'
-    if (mode === 'ar') status('Your artwork is in place', 'You can move back to your seat. Keep the device looking into the circle.')
+    if (mode === 'ar') status('Your artwork is in place', 'Step back slowly and keep the painting and tree in view.')
     if (!reusing) loadNarration(story, mode === 'ar')
     else { $('audio-message').textContent = 'Artwork repositioned. Tap play to continue.'; updateAudioUI() }
     if (mode === 'ar' && !trackingNormal) onTracking({detail:{status:'LIMITED', reason:'Waiting for world tracking'}})
@@ -441,7 +462,7 @@ function saveSettings() {
   if (current?.id === story.id) applyModelSettings()
 }
 function exportSettings() {
-  const updated = {...manifest,stories:manifest.stories.map(s => ({...s,...(overrides[String(s.id)] || {})}))}
+  const updated = {...manifest,stories:manifest.stories.map(s => ({placementMode:'wall',...s,...(overrides[String(s.id)] || {})}))}
   const blob = new Blob([JSON.stringify(updated,null,2)+'\n'],{type:'application/json'})
   const url = URL.createObjectURL(blob), link = document.createElement('a')
   link.href = url; link.download = 'stories.json'; document.body.appendChild(link); link.click(); link.remove()
