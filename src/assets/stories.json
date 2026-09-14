@@ -14,13 +14,13 @@
       "targetWidthMeters": 0.15,
       "targetImageWidthFactor": 1.12,
       "placementMode": "wall",
-      "sizeMeters": 1.2,
+      "sizeMeters": 8,
       "liftMeters": 0,
       "depthMeters": 0.35,
       "yawDegrees": 0,
       "pitchDegrees": 0,
       "rollDegrees": 0,
-      "offsetXMeters": 0
+      "offsetXMeters": -1
     },
     {
       "id": "2",
