@@ -15,7 +15,7 @@ const logLines = []
 function log(message) {
   logLines.push(new Date().toLocaleTimeString() + ' ' + message)
   if (logLines.length > 35) logLines.shift()
-  $('diagnostics').textContent = 'NAIDOC Stories v1.5\n' + navigator.userAgent + '\n\n' + logLines.join('\n')
+  $('diagnostics').textContent = 'NAIDOC Stories v1.6\n' + navigator.userAgent + '\n\n' + logLines.join('\n')
 }
 function status(title, detail, warning = false) {
   $('status-title').textContent = title
@@ -39,7 +39,7 @@ let manifest, stories = [], targets = [], scene, anchor, pivot, modelEl, current
 let phase = 'welcome', mode = 'ar', trackingNormal = false, needsReanchor = false
 let busy = false, operation = 0, worldUnitsPerMetre = 1, placementYaw = 0, modelExtent = 1
 let previewYaw = 0, previewPitch = .55, previewDistance = 2.2, previewCentre = .4, sceneWatchdog, loadedStoryId = null
-let audioController = null, narrationRequest = 0, audioContext, gain, audioBuffer, source, audioOffset = 0, audioStarted = 0, muted = false
+let audioElement = null, narrationRequest = 0, audioReady = false, audioLoadFailed = false, muted = false
 let limitedTimer, captureTimer
 const storageKey = 'naidoc-story-settings-v1'
 let overrides = {}
@@ -79,109 +79,86 @@ function engineReady() {
   })
 }
 function unlockAudio() {
-  try {
-    const AudioCtor = window.AudioContext || window.webkitAudioContext
-    if (!AudioCtor) return
-    if (!audioContext) {
-      audioContext = new AudioCtor()
-      gain = audioContext.createGain(); gain.connect(audioContext.destination)
-      audioContext.addEventListener('statechange', () => { log('Audio state: ' + audioContext.state); updateAudioUI() })
-    }
-    // Invoked directly by a tap, before awaiting camera or network operations.
-    audioContext.resume().catch(() => {})
-  } catch (error) { log('Audio unavailable: ' + error.message) }
+  // Create native media during the opening tap. Playback itself still waits
+  // for a deliberate Play tap, as required by iPadOS.
+  if (!audioElement) audioElement = document.createElement('audio')
 }
-function elapsed() {
-  return Math.min(audioBuffer?.duration || 0, source ? audioOffset + audioContext.currentTime - audioStarted : audioOffset)
-}
+function elapsed() { return Number.isFinite(audioElement?.currentTime) ? audioElement.currentTime : 0 }
 function pauseAudio() {
-  if (source) {
-    audioOffset = elapsed()
-    source.onended = null
-    try { source.stop() } catch (_) {}
-    source.disconnect(); source = null
-  }
+  audioElement?.pause()
   updateAudioUI()
 }
 function clearAudio() {
   narrationRequest++
-  audioController?.abort(); audioController = null
-  pauseAudio(); audioBuffer = null; audioOffset = 0
+  if (audioElement) {
+    audioElement.pause()
+    audioElement.removeAttribute('src')
+    audioElement.load()
+  }
+  audioElement = null; audioReady = false; audioLoadFailed = false
   updateAudioUI()
-}
-function audioDeadline(promise, milliseconds, message) {
-  let timer
-  return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), milliseconds) })]).finally(() => clearTimeout(timer))
 }
 async function playAudio() {
   unlockAudio()
-  if (!audioContext) { $('audio-message').textContent = 'Audio is unavailable on this browser.'; return }
-  if (!audioBuffer) {
-    if (current && !audioController) loadNarration(current, true)
-    return
-  }
-  const request = narrationRequest
+  if ((!audioElement?.src || audioLoadFailed) && current) loadNarration(current)
+  if (!audioElement?.src) { $('audio-message').textContent = 'This artwork has no recording yet.'; return }
   try {
     $('audio-message').textContent = 'Starting sound…'
-    await audioDeadline(audioContext.resume(), 2500, 'Audio activation timed out')
-    if (request !== narrationRequest) return
-    if (source || !audioBuffer || !['story', 'preview'].includes(phase) || document.hidden) return
-    if (audioContext.state !== 'running') throw new Error('Tap play to enable sound.')
-    if (audioOffset >= audioBuffer.duration - .05) audioOffset = 0
-    source = audioContext.createBufferSource(); source.buffer = audioBuffer
-    source.connect(gain); gain.gain.value = muted ? 0 : 1
-    audioStarted = audioContext.currentTime
-    source.onended = () => { source?.disconnect(); source = null; audioOffset = audioBuffer?.duration || 0; updateAudioUI() }
-    source.start(0, audioOffset)
+    if (audioElement.ended) audioElement.currentTime = 0
+    await audioElement.play()
     $('audio-message').textContent = ''
-  } catch (error) { if (request === narrationRequest) { $('audio-message').textContent = 'Recording loaded. Tap play to enable sound. If it stays silent, check the iPad volume and audio output.'; log('Playback: ' + error.message + '; state=' + audioContext.state) } }
+  } catch (error) {
+    $('audio-message').textContent = audioReady
+      ? 'Tap play to enable sound. Check the iPad volume if it stays silent.'
+      : 'The recording is still loading. Tap play again in a moment.'
+    log('Playback: ' + error.name + ': ' + error.message)
+  }
   updateAudioUI()
 }
-async function loadNarration(story, autoplay) {
+function loadNarration(story) {
   clearAudio()
   const request = narrationRequest
   if (!story.audio) { $('audio-message').textContent = 'This artwork has no recording yet.'; return }
-  if (!audioContext) { $('audio-message').textContent = 'Tap play to load the story.'; return }
-  $('audio-message').textContent = 'Loading the story…'
-  const controller = new AbortController(); audioController = controller
-  const timer = setTimeout(() => controller.abort(), 60000)
-  try {
-    const response = await fetch(localUrl(story.audio), {signal: controller.signal})
-    if (!response.ok) throw new Error('Recording download returned HTTP ' + response.status)
-    const bytes = await response.arrayBuffer()
+  $('audio-message').textContent = 'Loading the recording…'
+  audioElement = document.createElement('audio')
+  audioLoadFailed = false
+  audioElement.preload = 'auto'
+  audioElement.playsInline = true
+  audioElement.muted = muted
+  audioElement.addEventListener('canplay', () => {
     if (request !== narrationRequest) return
-    log('Recording downloaded: ' + bytes.byteLength + ' bytes; ' + (response.headers.get('content-type') || 'unknown type'))
-    $('audio-message').textContent = 'Preparing the recording…'
-    const decoded = await audioDeadline(new Promise((resolve, reject) => {
-      // Callbacks also cover older Safari implementations of decodeAudioData.
-      const result = audioContext.decodeAudioData(bytes, resolve, reject)
-      result?.catch(reject)
-    }), 20000, 'The browser could not prepare the MP3 in time')
-    if (request !== narrationRequest) return
-    audioBuffer = decoded; audioOffset = 0
-    log('Recording ready: ' + decoded.duration.toFixed(1) + ' seconds; audio state=' + audioContext.state)
+    audioReady = true
+    audioLoadFailed = false
     $('audio-message').textContent = 'Recording ready. Tap play to listen.'
-    audioController = null
-    if (autoplay && ['story','preview'].includes(phase) && !document.hidden) await playAudio()
-  } catch (error) {
-    if (request === narrationRequest) {
-      $('audio-message').textContent = 'Recording did not load. Tap play to try again.'
-      log('Recording: ' + error.message)
-    }
-  } finally {
-    clearTimeout(timer)
-    if (request === narrationRequest) audioController = null
+    log('Recording ready: ' + (Number.isFinite(audioElement.duration) ? audioElement.duration.toFixed(1) + ' seconds' : 'streaming'))
     updateAudioUI()
-  }
+  }, {once:true})
+  audioElement.addEventListener('loadedmetadata', () => { if (request === narrationRequest) { log('Recording metadata loaded'); updateAudioUI() } })
+  audioElement.addEventListener('playing', () => { if (request === narrationRequest) { $('audio-message').textContent = ''; updateAudioUI() } })
+  audioElement.addEventListener('pause', updateAudioUI)
+  audioElement.addEventListener('ended', updateAudioUI)
+  audioElement.addEventListener('waiting', () => { if (request === narrationRequest && !audioElement.paused) $('audio-message').textContent = 'Buffering the recording…' })
+  audioElement.addEventListener('error', () => {
+    if (request !== narrationRequest) return
+    const code = audioElement.error?.code || 0
+    audioLoadFailed = true
+    $('audio-message').textContent = 'Recording could not be opened on this device. Tap play to retry.'
+    log('Media error ' + code + '; network=' + audioElement.networkState + '; ready=' + audioElement.readyState + '; ' + audioElement.currentSrc)
+    updateAudioUI()
+  })
+  audioElement.src = localUrl(story.audio)
+  log('Opening recording with native media: ' + new URL(audioElement.src).pathname)
+  audioElement.load()
 }
 function clock(seconds) { const n = Math.floor(seconds || 0); return Math.floor(n / 60) + ':' + String(n % 60).padStart(2,'0') }
 function updateAudioUI() {
-  const playing = !!source && audioContext?.state === 'running'
+  const playing = !!audioElement && !audioElement.paused && !audioElement.ended
   $('play').textContent = playing ? 'Ⅱ' : '▶'
   $('play').setAttribute('aria-label', playing ? 'Pause narration' : 'Play narration')
-  $('elapsed').textContent = clock(elapsed()); $('duration').textContent = clock(audioBuffer?.duration)
-  if (document.activeElement !== $('seek')) $('seek').value = audioBuffer ? elapsed() / audioBuffer.duration * 1000 : 0
-  $('seek').disabled = !audioBuffer
+  const duration = Number.isFinite(audioElement?.duration) ? audioElement.duration : 0
+  $('elapsed').textContent = clock(elapsed()); $('duration').textContent = clock(duration)
+  if (document.activeElement !== $('seek')) $('seek').value = duration ? elapsed() / duration * 1000 : 0
+  $('seek').disabled = !duration
 }
 setInterval(updateAudioUI, 250)
 
@@ -487,7 +464,6 @@ async function init() {
       const option = document.createElement('option'); option.value=story.id; option.textContent=story.title; $(id).appendChild(option)
     }
   }
-  if (stories[0].image) { $('hero').src = localUrl(stories[0].image); $('hero').alt = stories[0].imageAlt || stories[0].title }
   $('story-count').textContent = String(stories.length).padStart(2,'0') + (stories.length === 1 ? ' STORY' : ' STORIES')
   $('preview').disabled = false
   // One missing target must not prevent the normal 3D fallback from opening.
@@ -556,10 +532,10 @@ $('reset-settings').addEventListener('click',() => {
   try { localStorage.setItem(storageKey,JSON.stringify(overrides)) } catch (_) {}
   populateSetup(); applyModelSettings()
 })
-$('play').addEventListener('click',() => { if (source && audioContext?.state === 'running') pauseAudio(); else { if (source) pauseAudio(); playAudio() } })
-$('restart').addEventListener('click',() => { pauseAudio(); audioOffset=0; playAudio() })
-$('seek').addEventListener('change',() => { const playing=!!source; pauseAudio(); audioOffset=Number($('seek').value)/1000*(audioBuffer?.duration||0); if (playing) playAudio(); updateAudioUI() })
-$('mute').addEventListener('click',() => { muted=!muted; if(gain)gain.gain.value=muted?0:1; $('mute').textContent=muted?'Muted':'Sound on'; $('mute').setAttribute('aria-pressed',String(muted)); $('mute').setAttribute('aria-label',muted?'Unmute narration':'Mute narration') })
+$('play').addEventListener('click',() => audioElement && !audioElement.paused ? pauseAudio() : playAudio())
+$('restart').addEventListener('click',() => { if (audioElement) audioElement.currentTime=0; playAudio() })
+$('seek').addEventListener('change',() => { if (!audioElement || !Number.isFinite(audioElement.duration)) return; const playing=!audioElement.paused; audioElement.currentTime=Number($('seek').value)/1000*audioElement.duration; if (playing) playAudio(); updateAudioUI() })
+$('mute').addEventListener('click',() => { muted=!muted; if(audioElement)audioElement.muted=muted; $('mute').textContent=muted?'Muted':'Sound on'; $('mute').setAttribute('aria-pressed',String(muted)); $('mute').setAttribute('aria-label',muted?'Unmute narration':'Mute narration') })
 $('rescan').addEventListener('click',beginRescan); $('another').addEventListener('click',anotherStory)
 $('story-select').addEventListener('change',() => { const story=stories.find(s=>s.id===$('story-select').value);if(story)showStory(story,null) })
 document.addEventListener('visibilitychange',() => {
