@@ -14,13 +14,13 @@
       "targetWidthMeters": 0.15,
       "targetImageWidthFactor": 1.12,
       "placementMode": "wall",
-      "sizeMeters": 8,
-      "liftMeters": 0,
-      "depthMeters": 0.35,
+      "sizeMeters": 7,
+      "liftMeters": -2,
+      "depthMeters": 4,
       "yawDegrees": 0,
       "pitchDegrees": 0,
       "rollDegrees": 0,
-      "offsetXMeters": -1
+      "offsetXMeters": -2
     },
     {
       "id": "2",
@@ -35,12 +35,12 @@
       "targetWidthMeters": 0.15,
       "targetImageWidthFactor": 1.2,
       "placementMode": "wall",
-      "sizeMeters": 1.2,
+      "sizeMeters": 4,
       "liftMeters": 0,
       "depthMeters": 0.35,
       "yawDegrees": 0,
-      "pitchDegrees": 0,
-      "rollDegrees": 0,
+      "pitchDegrees": 15,
+      "rollDegrees": -15,
       "offsetXMeters": 0
     },
     {
@@ -56,12 +56,12 @@
       "targetWidthMeters": 0.15,
       "targetImageWidthFactor": 1.2,
       "placementMode": "wall",
-      "sizeMeters": 1.2,
+      "sizeMeters": 3,
       "liftMeters": 0,
       "depthMeters": 0.35,
       "yawDegrees": 0,
       "pitchDegrees": 0,
-      "rollDegrees": 0,
+      "rollDegrees": 15,
       "offsetXMeters": 0
     },
     {
@@ -77,7 +77,7 @@
       "targetWidthMeters": 0.15,
       "targetImageWidthFactor": 1.2,
       "placementMode": "wall",
-      "sizeMeters": 1.2,
+      "sizeMeters": 2.4,
       "liftMeters": 0,
       "depthMeters": 0.35,
       "yawDegrees": 0,
@@ -98,10 +98,10 @@
       "targetWidthMeters": 0.15,
       "targetImageWidthFactor": 1.2,
       "placementMode": "wall",
-      "sizeMeters": 1.2,
-      "liftMeters": 0,
+      "sizeMeters": 1.8,
+      "liftMeters": 1,
       "depthMeters": 0.35,
-      "yawDegrees": 0,
+      "yawDegrees": 90,
       "pitchDegrees": 0,
       "rollDegrees": 0,
       "offsetXMeters": 0
@@ -121,9 +121,9 @@
       "placementMode": "wall",
       "sizeMeters": 1.2,
       "liftMeters": 0,
-      "depthMeters": 0.35,
+      "depthMeters": 0.25,
       "yawDegrees": 0,
-      "pitchDegrees": 0,
+      "pitchDegrees": -5,
       "rollDegrees": 0,
       "offsetXMeters": 0
     }
